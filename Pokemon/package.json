@@ -1,0 +1,7 @@
+{
+  "name": "pokemon",
+  "version": "1.0.0",
+  "bin": {
+    "pokemon": "./pokemon2.js"
+  }
+}
