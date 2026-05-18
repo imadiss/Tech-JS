@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-slate-50 text-slate-800 min-h-screen p-4 md:p-8 font-sans">
+
+<div class="max-w-4xl mx-auto space-y-8">
+  
+  <!-- HEADER -->
+  <header class="text-center pt-4">
+    <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">Book Tracker</h1>
+    <p class="text-slate-500 mt-2">Track your reading progress and catalog your library.</p>
+  </header>
+
+  <!-- FORM -->
+  <div class="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200">
+    <h2 class="text-lg font-semibold mb-4 text-slate-700 border-b pb-2">Add a New Book</h2>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <input id="title" placeholder="Book Title *" required class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"/>
+      <input id="author" placeholder="Author *" required class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"/>
+      
+      <!-- UPDATED: Added required and min attributes to Pages and Price -->
+      <input id="pages" type="number" min="1" required placeholder="Total Pages *" class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"/>
+      <input id="pagesRead" type="number" min="0" placeholder="Pages Read *" required class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"/>
+      
+      <input id="price" type="number" min="0.01" step="0.01" required placeholder="Price ($) *" class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"/>
+      <input id="suggestedBy" placeholder="Suggested By (Optional)" class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"/>
+
+      <!-- STATUS -->
+      <select id="status" class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+        <option value="" disabled selected>Select Status...</option>
+        <option>Read</option>
+        <option>Re-read</option>
+        <option>Currently reading</option>
+        <option>Want to read</option>
+        <option>DNF</option>
+        <option>Returned Unread</option>
+      </select>
+
+      <!-- FORMAT -->
+      <select id="format" class="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+        <option value="" disabled selected>Select Format...</option>
+        <option>Print</option>
+        <option>Ebook</option>
+        <option>AudioBook</option>
+        <option>PDF</option>
+      </select>
+    </div>
+
+    <div class="mt-6">
+      <button type="button"
+        onclick="addBook()"
+        class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-3 rounded-lg shadow-sm transition-colors duration-200">
+        + Add Book to Library
+      </button>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-2xl shadow-sm flex flex-col md:flex-row items-center justify-between">
+    <div>
+      <h3 class="text-blue-100 text-sm font-medium uppercase tracking-wider">Library Stats</h3>
+      <p id="stats" class="text-xl font-semibold mt-1">Loading...</p>
+    </div>
+  </div>
+
+  <!-- LIST -->
+  <div id="list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-12"></div>
+
+</div>
+
+<script>
+const API = "http://localhost:3000/books";
+
+let isSubmitting = false;
+
+// LOAD BOOKS
+async function loadBooks() {
+  try {
+    const res = await fetch(API);
+    const books = await res.json();
+
+    const list = document.getElementById("list");
+    list.innerHTML = "";
+
+    let totalPages = 0;
+    let totalRead = 0;
+
+    books.forEach(b => {
+      const percent = b.pages ? (b.pagesRead / b.pages) * 100 : 0;
+
+      totalPages += b.pages || 0;
+      totalRead += b.pagesRead || 0;
+
+      let statusColor = "bg-amber-400";
+      if (b.status === "Read" || b.status === "Re-read") statusColor = "bg-green-500";
+      if (b.status === "DNF" || b.status === "Returned Unread") statusColor = "bg-red-400";
+      if (b.status === "Want to read") statusColor = "bg-slate-400";
+
+      list.innerHTML += `
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col h-full relative overflow-hidden group hover:shadow-md transition-shadow duration-200">
+          
+          ${b.status === 'Read' ? '<div class="absolute top-0 right-0 bg-green-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg tracking-wider uppercase shadow-sm">Finished</div>' : ''}
+          
+          <div class="flex-grow pt-2">
+            <h2 class="text-lg font-bold text-slate-900 leading-tight truncate" title="${b.title}">${b.title}</h2>
+            <p class="text-slate-500 text-sm mb-4 truncate">by ${b.author}</p>
+            
+            <div class="flex flex-col gap-1 text-sm text-slate-600 mb-2 border-l-2 border-slate-100 pl-3">
+              <span class="inline-flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full ${statusColor}"></span>
+                ${b.status || 'Status unknown'}
+              </span>
+              <span class="inline-flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                ${b.format || 'Format unknown'}
+              </span>
+              <span class="inline-flex items-center gap-2">
+                <span class="text-slate-500 font-medium">Price:</span>
+                $${b.price ? b.price.toFixed(2) : '0.00'}
+              </span>
+            </div>
+          </div>
+
+          <div class="mt-4 pt-4 border-t border-slate-100">
+            <div class="flex justify-between text-xs font-medium text-slate-500 mb-1.5">
+              <span>Progress</span>
+              <span>${percent.toFixed(0)}%</span>
+            </div>
+            
+            <div class="bg-slate-100 h-2 rounded-full overflow-hidden mb-4">
+              <div class="bg-blue-500 h-full transition-all duration-700 ease-out" style="width:${percent}%"></div>
+            </div>
+
+            <!-- UPDATE PROGRESS & STATUS UI -->
+            <div class="flex items-center gap-2 mb-3 bg-slate-50 p-2 rounded-lg border border-slate-100">
+              <!-- Pages Input -->
+              <input id="update-pages-${b._id}" type="number" min="0" max="${b.pages || 0}" value="${b.pagesRead || 0}" 
+                class="w-16 border border-slate-300 rounded text-sm p-1 text-center focus:ring-2 focus:ring-blue-500 outline-none">
+              <span class="text-xs text-slate-500 font-medium">/ ${b.pages || 0}</span>
+              
+              <!-- Status Dropdown -->
+              <select id="update-status-${b._id}" class="w-full border border-slate-300 rounded text-xs p-1 focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                <option value="Read" ${b.status === 'Read' ? 'selected' : ''}>Read</option>
+                <option value="Re-read" ${b.status === 'Re-read' ? 'selected' : ''}>Re-read</option>
+                <option value="Currently reading" ${b.status === 'Currently reading' ? 'selected' : ''}>Currently reading</option>
+                <option value="Want to read" ${b.status === 'Want to read' ? 'selected' : ''}>Want to read</option>
+                <option value="DNF" ${b.status === 'DNF' ? 'selected' : ''}>DNF</option>
+                <option value="Returned Unread" ${b.status === 'Returned Unread' ? 'selected' : ''}>Returned Unread</option>
+              </select>
+
+              <!-- Save Button -->
+              <button onclick="updateProgress('${b._id}', ${b.pages})" 
+                class="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-3 py-1.5 rounded text-xs font-semibold transition-colors duration-200">
+                Save
+              </button>
+            </div>
+
+            <button onclick="deleteBook('${b._id}')"
+              class="w-full bg-white text-red-500 border border-red-100 hover:bg-red-50 hover:border-red-200 py-2 rounded-lg text-sm font-medium transition-colors duration-200">
+              Remove Book
+            </button>
+          </div>
+        </div>
+      `;
+    });
+
+    document.getElementById("stats").innerText =
+      `${books.length} Books | ${totalRead.toLocaleString()} / ${totalPages.toLocaleString()} Pages Read`;
+  } catch (error) {
+    console.error("Error loading books:", error);
+    document.getElementById("stats").innerText = "Error connecting to the server. Is your backend running?";
+  }
+}
+
+// ADD BOOK
+async function addBook() {
+  if (isSubmitting) return;
+  isSubmitting = true;
+
+  const pagesRaw = document.getElementById("pages").value;
+  const priceRaw = document.getElementById("price").value;
+  const pagesReadEl = document.getElementById("pagesRead");
+  const statusEl = document.getElementById("status");
+
+  // NEW VALIDATION: Ensure Pages is filled and strictly > 0
+  if (!pagesRaw || Number(pagesRaw) <= 0) {
+    alert("Please enter a valid total number of pages (must be greater than 0).");
+    isSubmitting = false;
+    return;
+  }
+
+  // NEW VALIDATION: Ensure Price is filled and strictly > 0
+  if (!priceRaw || Number(priceRaw) <= 0) {
+    alert("Please enter a valid price (must be greater than 0).");
+    isSubmitting = false;
+    return;
+  }
+
+  const p = Number(pagesRaw);
+  const price = Number(priceRaw);
+  const pr = Number(pagesReadEl.value);
+  let currentStatus = statusEl.value || "Currently reading";
+
+  if (pr > p && p !== 0) {
+    alert("Pages read cannot be greater than total pages!");
+    isSubmitting = false;
+    return;
+  }
+
+  if (currentStatus === "Read" && pr < p) {
+    alert("You cannot mark a book as 'Read' if you haven't finished all the pages!");
+    isSubmitting = false;
+    return;
+  }
+
+  if (pr === p && p > 0) {
+    currentStatus = "Read";
+  }
+
+  const book = {
+    title: document.getElementById("title").value || "Untitled",
+    author: document.getElementById("author").value || "Unknown",
+    pages: p,
+    price: price,
+    pagesRead: pr,
+    status: currentStatus,
+    format: document.getElementById("format").value || "Print",
+    suggestedBy: document.getElementById("suggestedBy").value,
+    finished: pr === p && p > 0
+  };
+
+  try {
+    await fetch(API, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(book)
+    });
+
+    // Clear inputs
+    document.getElementById("title").value = '';
+    document.getElementById("author").value = '';
+    document.getElementById("pages").value = '';
+    document.getElementById("price").value = '';
+    document.getElementById("pagesRead").value = '';
+    document.getElementById("suggestedBy").value = '';
+    document.getElementById("status").value = '';
+    document.getElementById("format").value = '';
+    
+    await loadBooks();
+  } catch (error) {
+    console.error("Error adding book:", error);
+    alert("Failed to add book. Make sure your server is running.");
+  } finally {
+    isSubmitting = false;
+  }
+}
+
+// UPDATE PROGRESS & STATUS
+async function updateProgress(id, totalPages) {
+  const pagesInput = document.getElementById(`update-pages-${id}`);
+  const statusInput = document.getElementById(`update-status-${id}`);
+  
+  const newPagesRead = Number(pagesInput.value);
+  let newStatus = statusInput.value;
+
+  // Safety: Prevent impossible math
+  if (newPagesRead < 0 || (totalPages > 0 && newPagesRead > totalPages)) {
+    alert("Invalid page number! Ensure it is between 0 and " + totalPages);
+    await loadBooks(); 
+    return;
+  }
+
+  // Safety: Prevent marking as "Read" too early
+  if (newStatus === "Read" && newPagesRead < totalPages) {
+    alert("You cannot mark a book as 'Read' if you haven't finished all the pages!");
+    await loadBooks();
+    return;
+  }
+
+  // Auto-graduate to "Read" if maxed out, BUT allow "Re-read" to stay
+  if (newPagesRead === totalPages && totalPages > 0) {
+    if (newStatus !== "Re-read") {
+      newStatus = "Read";
+    }
+  }
+
+  try {
+    await fetch(`${API}/${id}`, {
+      method: "PUT", 
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        pagesRead: newPagesRead, 
+        status: newStatus 
+      })
+    });
+
+    await loadBooks();
+  } catch (error) {
+    console.error("Error updating book:", error);
+    alert("Failed to update. Make sure your server is running.");
+  }
+}
+
+// DELETE BOOK
+async function deleteBook(id) {
+  if(!confirm("Are you sure you want to delete this book?")) return;
+  
+  try {
+    await fetch(`${API}/${id}`, {
+      method: "DELETE"
+    });
+
+    await loadBooks();
+  } catch (error) {
+    console.error("Error deleting book:", error);
+    alert("Failed to delete. Make sure your server is running.");
+  }
+}
+
+// Initial load
+loadBooks();
+</script>
+
+</body>
+</html>
